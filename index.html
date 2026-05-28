@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slink Enterprise - Advanced Link Management</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        
+        :root {
+            --brand-blue: #1e40af;
+            --dark-bg: #0f172a;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--dark-bg);
+            color: #f1f5f9;
+        }
+
+        .glass-morphism {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .sidebar-active {
+            background: linear-gradient(90deg, rgba(30, 64, 175, 0.2) 0%, rgba(30, 64, 175, 0) 100%);
+            border-left: 4px solid #3b82f6;
+            color: #60a5fa;
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 5px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #0f172a; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+
+        .animate-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .qr-placeholder {
+            background: white;
+            padding: 8px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const Icon = ({ name, size = 18, className = "" }) => {
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} style={{ width: size, height: size }} className={`inline-block shrink-0 ${className}`}></i>;
+        };
+
+        const Card = ({ children, className = "" }) => (
+            <div className={`glass-morphism rounded-3xl p-6 ${className}`}>{children}</div>
+        );
+
+        function App() {
+            const [authState, setAuthState] = useState('landing'); // landing, login, register, forgot, dashboard
+            const [user, setUser] = useState({ name: 'Admin Ultra', email: 'admin@hero4d.com', role: 'Admin' });
+            const [activeMenu, setActiveMenu] = useState('dashboard');
+            const [toast, setToast] = useState(null);
+
+            // Database Simulasi
+            const [links, setLinks] = useState([
+                { id: 'l1', title: 'Promo Hero4D', alias: 'hero4d', target: 'https://hero4d-main.com', clicks: 4250, unique: 3120, status: 'Active', pixel: 'Meta Pixel', password: '', expiry: '2026-12-31' },
+                { id: 'l2', title: 'Webinar Belajar AI', alias: 'belajar-ai', target: 'https://webinar.com/ai', clicks: 890, unique: 750, status: 'Active', pixel: 'None', password: '123', expiry: '' }
+            ]);
+
+            const [visitors, setVisitors] = useState([
+                { id: 1, alias: 'hero4d', ip: '182.1.23.45', country: 'Indonesia', city: 'Jakarta', device: 'Mobile', os: 'Android 14', browser: 'Chrome', time: '10:30:12', referrer: 'Instagram' },
+                { id: 2, alias: 'hero4d', ip: '66.249.66.1', country: 'USA', city: 'Mountain View', device: 'Desktop', os: 'Windows 11', browser: 'Edge', time: '11:15:05', referrer: 'Google' },
+                { id: 3, alias: 'belajar-ai', ip: '103.11.22.33', country: 'Singapore', city: 'Singapore', device: 'Mobile', os: 'iOS 17', browser: 'Safari', time: '12:00:45', referrer: 'Facebook' }
+            ]);
+
+            const [pixels, setPixels] = useState([
+                { id: 'p1', name: 'Meta Pixel Utama', type: 'Meta', code: 'PX-998812' },
+                { id: 'p2', name: 'G-Analytics 4', type: 'Google', code: 'G-772211' }
+            ]);
+
+            const showToast = (msg, type = 'success') => {
+                setToast({ msg, type });
+                setTimeout(() => setToast(null), 3000);
+            };
+
+            if (authState === 'landing') return <LandingPage onStart={() => setAuthState('login')} />;
+            if (authState === 'login') return <LoginPage onLogin={() => { setAuthState('dashboard'); showToast('Selamat datang kembali!'); }} onSwitch={() => setAuthState('register')} onForgot={() => setAuthState('forgot')} />;
+            if (authState === 'register') return <RegisterPage onRegister={() => setAuthState('login')} onSwitch={() => setAuthState('login')} />;
+            if (authState === 'forgot') return <ForgotPage onBack={() => setAuthState('login')} />;
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    {/* SIDEBAR */}
+                    <aside className="w-72 border-r border-slate-800 flex flex-col glass-morphism shrink-0">
+                        <div className="p-8 flex items-center gap-3">
+                            <div className="bg-blue-600 p-2.5 rounded-2xl shadow-lg shadow-blue-500/30">
+                                <Icon name="zap" className="text-white" size={24} />
+                            </div>
+                            <h1 className="text-2xl font-extrabold tracking-tighter text-white">Slink<span className="text-blue-500">Ultra</span></h1>
+                        </div>
+
+                        <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scroll">
+                            <SidebarGroup label="Menu Utama" />
+                            <NavItem active={activeMenu === 'dashboard'} icon="layout-dashboard" label="Dashboard" onClick={() => setActiveMenu('dashboard')} />
+                            <NavItem active={activeMenu === 'links'} icon="link-2" label="Kelola Shortlink" onClick={() => setActiveMenu('links')} />
+                            <NavItem active={activeMenu === 'visitors'} icon="users" label="Data Klik / Visitor" onClick={() => setActiveMenu('visitors')} />
+                            
+                            <SidebarGroup label="Marketing & Tools" />
+                            <NavItem active={activeMenu === 'pixels'} icon="code" label="Pixel Setting" onClick={() => setActiveMenu('pixels')} />
+                            <NavItem active={activeMenu === 'analytics'} icon="bar-chart-3" label="Analytics" onClick={() => setActiveMenu('analytics')} />
+                            <NavItem active={activeMenu === 'api'} icon="terminal" label="API Shortlink" onClick={() => setActiveMenu('api')} />
+
+                            <SidebarGroup label="Sistem" />
+                            {user.role === 'Admin' && <NavItem active={activeMenu === 'admin'} icon="shield-check" label="Admin Panel" onClick={() => setActiveMenu('admin')} />}
+                            <NavItem active={activeMenu === 'settings'} icon="settings" label="Setting Akun" onClick={() => setActiveMenu('settings')} />
+                        </nav>
+
+                        <div className="p-6 border-t border-slate-800 space-y-4">
+                            <button onClick={() => setActiveMenu('simulator')} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-2xl flex items-center justify-center gap-2 font-bold transition-all shadow-xl shadow-blue-900/20">
+                                <Icon name="play" size={16} /> Simulator Engine
+                            </button>
+                            <button onClick={() => setAuthState('landing')} className="w-full text-slate-500 hover:text-red-500 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all">
+                                <Icon name="log-out" size={14} /> Logout
+                            </button>
+                        </div>
+                    </aside>
+
+                    {/* MAIN CONTENT */}
+                    <main className="flex-1 flex flex-col overflow-hidden bg-slate-950">
+                        <header className="h-20 border-b border-slate-800 flex items-center justify-between px-10 shrink-0 glass-morphism">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-slate-800 rounded-lg"><Icon name="chevron-right" className="text-blue-500" /></div>
+                                <h2 className="text-xl font-bold capitalize text-white">{activeMenu.replace('-',' ')}</h2>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                    <div className="text-sm font-bold text-white">{user.name}</div>
+                                    <div className="text-[10px] text-blue-500 font-bold uppercase tracking-widest">{user.role} Member</div>
+                                </div>
+                                <div className="h-12 w-12 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center font-extrabold text-white shadow-xl shadow-blue-600/20 border border-white/10">A</div>
+                            </div>
+                        </header>
+
+                        <div className="flex-1 overflow-y-auto p-10 custom-scroll animate-in">
+                            {activeMenu === 'dashboard' && <DashboardView links={links} visitors={visitors} />}
+                            {activeMenu === 'links' && <LinksView links={links} setLinks={setLinks} showToast={showToast} />}
+                            {activeMenu === 'visitors' && <VisitorsView visitors={visitors} />}
+                            {activeMenu === 'pixels' && <PixelsView pixels={pixels} setPixels={setPixels} showToast={showToast} />}
+                            {activeMenu === 'analytics' && <AnalyticsView visitors={visitors} />}
+                            {activeMenu === 'api' && <ApiView />}
+                            {activeMenu === 'settings' && <SettingsView user={user} setUser={setUser} showToast={showToast} />}
+                            {activeMenu === 'admin' && <AdminPanelView />}
+                            {activeMenu === 'simulator' && <SimulatorView links={links} visitors={visitors} setVisitors={setVisitors} setLinks={setLinks} showToast={showToast} />}
+                        </div>
+                    </main>
+
+                    {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+                </div>
+            );
+        }
+
+        function SidebarGroup({ label }) {
+            return <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em] mb-2 mt-8 px-4">{label}</p>;
+        }
+
+        function NavItem({ active, icon, label, onClick }) {
+            return (
+                <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${active ? 'sidebar-active text-blue-400' : 'text-slate-500 hover:bg-slate-900/50 hover:text-slate-300'}`}>
+                    <Icon name={icon} /> <span>{label}</span>
+                </button>
+            );
+        }
+
+        const Toast = ({ message, type, onClose }) => (
+            <div className={`fixed bottom-8 right-8 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl animate-fade-in border ${type === 'success' ? 'bg-emerald-900/90 border-emerald-500 text-emerald-200' : 'bg-red-900/90 border-red-500 text-red-200'}`}>
+                <Icon name={type === 'success' ? 'check-circle' : 'alert-circle'} />
+                <span className="font-bold text-sm">{message}</span>
+                <button onClick={onClose} className="ml-2 hover:opacity-50"><Icon name="x" size={14} /></button>
+            </div>
+        );
+
+        function DashboardView({ links, visitors }) {
+            const totalClicks = links.reduce((a, b) => a + b.clicks, 0);
+            const totalUnique = links.reduce((a, b) => a + b.unique, 0);
+
+            return (
+                <div className="space-y-10">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <StatCard icon="mouse-pointer-2" color="text-blue-400" bg="bg-blue-400/10" label="Total Klik" value={totalClicks.toLocaleString()} trend="+12% bulan ini" />
+                        <StatCard icon="user-check" color="text-emerald-400" bg="bg-emerald-400/10" label="Klik Unik" value={totalUnique.toLocaleString()} trend="+8% bulan ini" />
+                        <StatCard icon="link-2" color="text-amber-400" bg="bg-amber-400/10" label="Link Aktif" value={links.length} trend="2 link baru" />
+                        <StatCard icon="globe" color="text-indigo-400" bg="bg-indigo-400/10" label="Negara Visitor" value={new Set(visitors.map(v => v.country)).size} trend="Top: Indonesia" />
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <Card>
+                            <div className="flex justify-between items-center mb-8">
+                                <h3 className="font-bold text-lg flex items-center gap-2"><Icon name="clock" className="text-blue-500" /> Log Pengunjung Terbaru</h3>
+                                <button className="text-xs text-blue-400 font-bold hover:underline">Lihat Semua</button>
+                            </div>
+                            <div className="space-y-4">
+                                {visitors.slice(0, 5).map(v => (
+                                    <div key={v.id} className="flex items-center justify-between p-4 bg-slate-900/50 rounded-2xl border border-slate-800/50 hover:border-blue-500/30 transition-all">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-10 w-10 bg-slate-800 rounded-xl flex items-center justify-center font-bold text-blue-400">{v.country.substring(0,2)}</div>
+                                            <div>
+                                                <div className="text-sm font-bold text-white">/{v.alias} diklik</div>
+                                                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">{v.ip} • {v.city}, {v.country}</div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-[10px] text-slate-400 font-bold mb-1">{v.time}</div>
+                                            <div className="flex gap-1">
+                                                <Icon name={v.device === 'Mobile' ? 'smartphone' : 'monitor'} size={12} className="text-slate-600" />
+                                                <span className="text-[9px] font-bold text-slate-600 uppercase">{v.browser}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+
+                        <Card className="flex flex-col justify-center items-center text-center space-y-6">
+                            <div className="h-32 w-32 bg-blue-600/10 rounded-full flex items-center justify-center border-4 border-blue-500/20">
+                                <Icon name="bar-chart-3" size={48} className="text-blue-500" />
+                            </div>
+                            <div>
+                                <h4 className="text-xl font-bold mb-2">Statistik Mingguan</h4>
+                                <p className="text-sm text-slate-500 max-w-xs mx-auto">Trafik anda meningkat 15% minggu ini dibandingkan minggu lalu. Terus tingkatkan promosi anda!</p>
+                            </div>
+                            <div className="flex gap-2 w-full pt-4">
+                                <button className="flex-1 bg-slate-800 hover:bg-slate-700 py-3 rounded-2xl font-bold text-sm transition-all">Download Laporan</button>
+                                <button className="flex-1 bg-blue-600 hover:bg-blue-500 py-3 rounded-2xl font-bold text-sm transition-all shadow-lg shadow-blue-900/20">Cek Analytics</button>
+                            </div>
+                        </Card>
+                    </div>
+                </div>
+            );
+        }
+
+        function StatCard({ icon, color, bg, label, value, trend }) {
+            return (
+                <Card className="hover:scale-[1.02] transition-all group cursor-default">
+                    <div className={`mb-5 p-3.5 rounded-2xl w-fit ${bg} ${color} group-hover:scale-110 transition-all shadow-inner`}><Icon name={icon} size={28} /></div>
+                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</div>
+                    <div className="text-4xl font-extrabold text-white tracking-tighter mb-2">{value}</div>
+                    <div className="text-[10px] font-bold text-emerald-500 flex items-center gap-1">
+                        <Icon name="trending-up" size={12} /> {trend}
+                    </div>
+                </Card>
+            );
+        }
+
+        function LinksView({ links, setLinks, showToast }) {
+            const [isAdding, setIsAdding] = useState(false);
+            const [form, setForm] = useState({ title: '', target: '', alias: '', password: '', expiry: '' });
+
+            const handleAdd = (e) => {
+                e.preventDefault();
+                if (!form.alias || !form.target) return showToast("Wajib isi target dan alias!", "error");
+                const newLink = { 
+                    id: Date.now(), 
+                    ...form, 
+                    clicks: 0, 
+                    unique: 0, 
+                    status: 'Active', 
+                    pixel: 'None' 
+                };
+                setLinks([newLink, ...links]);
+                setForm({ title: '', target: '', alias: '', password: '', expiry: '' });
+                setIsAdding(false);
+                showToast("Shortlink Berhasil Dibuat!");
+            };
+
+            return (
+                <div className="space-y-8">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-2xl font-bold text-white">Kelola Tautan</h3>
+                        <button onClick={() => setIsAdding(!isAdding)} className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-blue-900/20 transition-all">
+                            <Icon name={isAdding ? 'x' : 'plus'} size={18} /> {isAdding ? 'Batal' : 'Buat Link Baru'}
+                        </button>
+                    </div>
+
+                    {isAdding && (
+                        <Card className="animate-in">
+                            <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <FormGroup label="Nama Kampanye" placeholder="Contoh: Promo Hero4D" value={form.title} onChange={v => setForm({...form, title: v})} />
+                                <FormGroup label="URL Tujuan (Target)" placeholder="https://..." value={form.target} onChange={v => setForm({...form, target: v})} />
+                                <FormGroup label="Custom Alias" placeholder="hero4d" value={form.alias} onChange={v => setForm({...form, alias: v})} prefix="hero4d.id/" />
+                                <FormGroup label="Password Protected (Opsional)" placeholder="Sandi link" value={form.password} onChange={v => setForm({...form, password: v})} type="password" />
+                                <FormGroup label="Tanggal Kadaluwarsa" value={form.expiry} onChange={v => setForm({...form, expiry: v})} type="date" />
+                                <div className="flex items-end">
+                                    <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 h-12 rounded-xl font-bold shadow-lg shadow-blue-900/20 transition-all">Simpan Shortlink</button>
+                                </div>
+                            </form>
+                        </Card>
+                    )}
+
+                    <div className="space-y-4">
+                        {links.map(link => (
+                            <Card key={link.id} className="flex flex-col lg:flex-row items-center gap-8 group hover:border-blue-500/50 transition-all">
+                                <div className="h-20 w-20 bg-slate-900 p-2 rounded-2xl flex items-center justify-center qr-placeholder shrink-0 group-hover:scale-105 transition-all">
+                                    <Icon name="qr-code" size={48} className="text-slate-900" />
+                                </div>
+                                <div className="flex-1 space-y-2">
+                                    <div className="flex items-center gap-3">
+                                        <h4 className="text-xl font-extrabold text-white">{link.title}</h4>
+                                        {link.password && <Icon name="lock" size={14} className="text-amber-500" />}
+                                    </div>
+                                    <div className="text-blue-400 font-extrabold text-sm tracking-tight flex items-center gap-2">
+                                        hero4d.id/{link.alias}
+                                        <button onClick={() => { document.execCommand('copy'); showToast("Link disalin!"); }} className="p-1 hover:bg-slate-800 rounded transition"><Icon name="copy" size={12}/></button>
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 font-mono truncate max-w-xs">{link.target}</div>
+                                </div>
+                                <div className="flex gap-10 px-10 border-x border-slate-800/50 text-center">
+                                    <div>
+                                        <div className="text-[10px] text-slate-500 font-bold uppercase mb-1">Total Klik</div>
+                                        <div className="text-2xl font-black text-white">{link.clicks.toLocaleString()}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] text-slate-500 font-bold uppercase mb-1">Status</div>
+                                        <div className="text-xs font-bold text-emerald-400">{link.status}</div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button className="p-3 bg-slate-800 hover:bg-slate-700 rounded-xl transition text-slate-400"><Icon name="edit" size={16}/></button>
+                                    <button onClick={() => setLinks(links.filter(l => l.id !== link.id))} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-inner"><Icon name="trash" size={16}/></button>
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        function FormGroup({ label, placeholder, value, onChange, prefix, type = 'text' }) {
+            return (
+                <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</label>
+                    <div className="relative">
+                        {prefix && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">{prefix}</span>}
+                        <input type={type} className={`w-full bg-slate-900/50 border border-slate-800 rounded-xl py-3 px-4 ${prefix ? 'pl-20' : ''} text-sm focus:border-blue-500 outline-none transition-all placeholder:text-slate-700`} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} />
+                    </div>
+                </div>
+            );
+        }
+
+        function VisitorsView({ visitors }) {
+            return (
+                <Card className="p-0 overflow-hidden">
+                    <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                        <h3 className="font-bold">Real-time Visitor Intelligence</h3>
+                        <button className="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest transition flex items-center gap-2">
+                            <Icon name="download" size={14} /> Export CSV
+                        </button>
+                    </div>
+                    <div className="overflow-x-auto custom-scroll">
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-900/50 text-slate-500 font-bold uppercase tracking-widest border-b border-slate-800">
+                                <tr>
+                                    <th className="px-8 py-5">Waktu</th>
+                                    <th className="px-8 py-5">Link</th>
+                                    <th className="px-8 py-5">IP Address</th>
+                                    <th className="px-8 py-5">Geo Location</th>
+                                    <th className="px-8 py-5">Device / OS</th>
+                                    <th className="px-8 py-5 text-right">Referrer</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/50">
+                                {visitors.map(v => (
+                                    <tr key={v.id} className="hover:bg-blue-600/5 transition group">
+                                        <td className="px-8 py-5 text-slate-500 font-bold">{v.time}</td>
+                                        <td className="px-8 py-5 font-extrabold text-blue-400 group-hover:translate-x-1 transition-all tracking-tight">/{v.alias}</td>
+                                        <td className="px-8 py-5 font-mono text-slate-300 font-bold">{v.ip}</td>
+                                        <td className="px-8 py-5">
+                                            <div className="font-bold text-slate-200">{v.country}</div>
+                                            <div className="text-[10px] text-slate-600">{v.city}</div>
+                                        </td>
+                                        <td className="px-8 py-5">
+                                            <div className="flex items-center gap-2">
+                                                <Icon name={v.device === 'Mobile' ? 'smartphone' : 'monitor'} size={14} className="text-slate-600" />
+                                                <span className="font-bold text-slate-400">{v.os}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-5 text-right font-bold text-slate-500">{v.referrer}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            );
+        }
+
+        function PixelsView({ pixels, setPixels, showToast }) {
+            const [form, setForm] = useState({ name: '', type: 'Meta', code: '' });
+            return (
+                <div className="space-y-8">
+                    <Card>
+                        <h3 className="text-lg font-bold mb-6">Integrasi Tracking Pixel</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                            <FormGroup label="Label Pixel" placeholder="Misal: Retargeting FB" value={form.name} onChange={v => setForm({...form, name: v})} />
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Platform</label>
+                                <select className="w-full bg-slate-900/50 border border-slate-800 rounded-xl py-3 px-4 text-sm focus:border-blue-500 outline-none transition-all" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
+                                    <option>Meta</option>
+                                    <option>Google</option>
+                                    <option>TikTok</option>
+                                    <option>Custom</option>
+                                </select>
+                            </div>
+                            <FormGroup label="Pixel ID / Script" placeholder="PX-XXXXXX" value={form.code} onChange={v => setForm({...form, code: v})} />
+                            <button onClick={() => { setPixels([...pixels, {id: Date.now(), ...form}]); showToast("Pixel Berhasil Ditambah!"); setForm({name:'', type:'Meta', code:''}); }} className="bg-blue-600 hover:bg-blue-500 h-12 rounded-xl font-bold shadow-lg shadow-blue-900/20 transition-all">Simpan Pixel</button>
+                        </div>
+                    </Card>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {pixels.map(p => (
+                            <Card key={p.id} className="border-t-4 border-t-blue-500">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${p.type === 'Meta' ? 'bg-blue-500 text-white' : p.type === 'Google' ? 'bg-emerald-500 text-white' : 'bg-pink-600 text-white'}`}>{p.type}</div>
+                                    <button onClick={() => setPixels(pixels.filter(x => x.id !== p.id))} className="text-slate-600 hover:text-red-500"><Icon name="trash" size={14} /></button>
+                                </div>
+                                <h4 className="text-lg font-bold text-white mb-1">{p.name}</h4>
+                                <div className="text-xs font-mono text-slate-500">{p.code}</div>
+                            </Card>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        function SimulatorView({ links, visitors, setVisitors, setLinks, showToast }) {
+            const [selectedAlias, setSelectedAlias] = useState('');
+            const [status, setStatus] = useState('idle'); // idle, loading, success, password
+            const [passInput, setPassInput] = useState('');
+
+            const runSim = () => {
+                const link = links.find(l => l.alias === selectedAlias);
+                if (!link) return showToast("Pilih link dulu!", "error");
+                
+                setStatus('loading');
+                setTimeout(() => {
+                    if (link.password && passInput !== link.password) {
+                        setStatus('password');
+                    } else {
+                        // Update Data
+                        const newVis = {
+                            id: Date.now(), alias: link.alias, ip: '192.168.' + Math.floor(Math.random()*255), country: 'Indonesia', city: 'Surabaya', device: 'Mobile', os: 'Android', browser: 'Chrome', time: 'Baru Saja', referrer: 'Direct'
+                        };
+                        setVisitors([newVis, ...visitors]);
+                        setLinks(links.map(l => l.id === link.id ? {...l, clicks: l.clicks + 1, unique: l.unique + 1} : l));
+                        setStatus('success');
+                    }
+                }, 1500);
+            };
+
+            return (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                    <Card className="space-y-8">
+                        <div className="flex items-center gap-3"><Icon name="cpu" className="text-emerald-500" /> <h3 className="text-xl font-bold">Simulator Engine</h3></div>
+                        <div className="space-y-6">
+                            <FormGroup label="Pilih Target Link" placeholder="Pilih..." value={selectedAlias} onChange={v => setSelectedAlias(v)} type="select" />
+                            {selectedAlias && (
+                                <div className="p-4 bg-blue-900/10 rounded-2xl border border-blue-500/20">
+                                    <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2">Konfigurasi Link:</div>
+                                    <div className="text-xs text-slate-400 space-y-1">
+                                        <div><span className="font-bold">Target:</span> {links.find(l => l.alias === selectedAlias)?.target}</div>
+                                        <div><span className="font-bold">Password:</span> {links.find(l => l.alias === selectedAlias)?.password ? 'Ya' : 'Tidak'}</div>
+                                    </div>
+                                </div>
+                            )}
+                            {status === 'password' && <FormGroup label="Masukkan Sandi Link" placeholder="Sandi dibutuhkan" value={passInput} onChange={v => setPassInput(v)} type="password" />}
+                            <button onClick={runSim} className="w-full bg-emerald-600 hover:bg-emerald-500 py-5 rounded-2xl font-black shadow-2xl shadow-emerald-900/30 transition-all flex items-center justify-center gap-3">
+                                <Icon name="mouse-pointer-2" size={20} /> SIMULASIKAN KLIK
+                            </button>
+                        </div>
+                    </Card>
+
+                    <div className="bg-slate-900 border-[12px] border-slate-800 rounded-[50px] overflow-hidden h-[600px] flex flex-col relative shadow-2xl">
+                        <div className="bg-slate-800 p-4 text-center border-b border-slate-700 flex items-center justify-center gap-2">
+                             <div className="flex gap-1 absolute left-6">
+                                <div className="w-2.5 h-2.5 rounded-full bg-red-500/40"></div>
+                                <div className="w-2.5 h-2.5 rounded-full bg-amber-500/40"></div>
+                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/40"></div>
+                             </div>
+                             <div className="bg-slate-950 px-6 py-1.5 rounded-full text-[10px] font-mono text-slate-500 border border-slate-700">hero4d.id/{selectedAlias || '...'}</div>
+                        </div>
+                        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-gradient-to-b from-slate-950 to-slate-900">
+                            {status === 'idle' && <div className="animate-pulse flex flex-col items-center"><Icon name="globe" size={64} className="text-slate-800 mb-6" /><h4 className="text-slate-700 font-bold uppercase tracking-widest">Menunggu Kunjungan</h4></div>}
+                            {status === 'loading' && <div className="space-y-6 flex flex-col items-center"><div className="h-16 w-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div><h4 className="text-blue-500 font-bold uppercase tracking-widest">Tracking IP & Pixel...</h4></div>}
+                            {status === 'success' && <div className="animate-in flex flex-col items-center"><div className="h-20 w-20 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mb-6"><Icon name="check-circle" size={40} /></div><h4 className="text-2xl font-black text-white mb-2 uppercase tracking-tighter">Redirect Sukses</h4><p className="text-slate-500 text-sm mb-10">Data telah masuk ke Dashboard & Log Visitor.</p><button onClick={() => setStatus('idle')} className="px-6 py-2 border border-slate-700 rounded-xl text-[10px] font-bold text-slate-600 uppercase">Ulangi Tes</button></div>}
+                            {status === 'password' && <div className="animate-in flex flex-col items-center"><Icon name="lock" size={64} className="text-amber-500 mb-6" /><h4 className="text-2xl font-black text-white mb-2 uppercase tracking-tighter">Link Terkunci</h4><p className="text-slate-500 text-sm">Masukkan password di panel kontrol untuk lanjut.</p></div>}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function LandingPage({ onStart }) {
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center animate-in">
+                    <div className="bg-blue-600 w-24 h-24 rounded-[40px] flex items-center justify-center mb-10 shadow-2xl shadow-blue-500/40 border border-white/20 rotate-3">
+                        <Icon name="zap" size={48} className="text-white" />
+                    </div>
+                    <h1 className="text-7xl font-black mb-6 tracking-tighter text-white">Slink<span className="text-blue-500">Ultra</span></h1>
+                    <p className="text-slate-400 text-xl max-w-2xl mb-12 font-medium leading-relaxed">Ekosistem manajemen link paling canggih untuk Digital Marketer. Lengkap dengan <span className="text-blue-400 font-bold">Geo-Tracking</span>, <span className="text-emerald-400 font-bold">Pixel Logic</span>, dan <span className="text-indigo-400 font-bold">Security Pro</span>.</p>
+                    <div className="flex flex-col sm:flex-row gap-4">
+                        <button onClick={onStart} className="bg-blue-600 hover:bg-blue-500 text-white px-12 py-5 rounded-[24px] font-black transition-all shadow-2xl shadow-blue-600/30 flex items-center gap-3">Mulai Sekarang <Icon name="arrow-right" /></button>
+                        <button className="bg-slate-800 hover:bg-slate-700 text-white px-12 py-5 rounded-[24px] font-black transition-all">Pelajari Fitur</button>
+                    </div>
+                </div>
+            );
+        }
+
+        function LoginPage({ onLogin, onSwitch, onForgot }) {
+            return (
+                <div className="min-h-screen flex items-center justify-center p-6">
+                    <Card className="w-full max-w-md p-12 border border-white/5 animate-in">
+                        <div className="flex flex-col items-center mb-10">
+                            <div className="bg-blue-600 p-3 rounded-2xl mb-4"><Icon name="lock" className="text-white" size={24} /></div>
+                            <h2 className="text-3xl font-black text-white">Masuk Akun</h2>
+                            <p className="text-slate-500 text-sm font-bold mt-2 uppercase tracking-widest">Slink Ultra Dashboard</p>
+                        </div>
+                        <div className="space-y-6 mb-8">
+                            <FormGroup label="Email Address" placeholder="admin@hero4d.com" />
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Password</label><button onClick={onForgot} className="text-[10px] font-bold text-blue-500 uppercase hover:underline">Lupa Sandi?</button></div>
+                                <input type="password" placeholder="••••••••" className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 px-4 text-sm focus:border-blue-500 outline-none transition-all" />
+                            </div>
+                        </div>
+                        <button onClick={onLogin} className="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-black text-white shadow-xl shadow-blue-600/20 transition-all active:scale-95">Login Sekarang</button>
+                        <p className="text-center text-xs text-slate-600 mt-8">Belum punya akun? <button onClick={onSwitch} className="text-blue-500 font-bold hover:underline">Daftar Akun</button></p>
+                    </Card>
+                </div>
+            );
+        }
+
+        /* Placeholder Pages... */
+        function AnalyticsView() { return <div className="py-20 text-center"><Icon name="bar-chart-3" size={80} className="text-blue-500/20 mx-auto mb-6"/><h3 className="text-3xl font-black uppercase tracking-tighter">Advanced Analytics</h3><p className="text-slate-500 max-w-sm mx-auto">Sistem sedang memproses data untuk menghasilkan grafik harian, mingguan, dan bulanan anda secara real-time.</p></div>; }
+        function ApiView() { return <div className="py-20 text-center"><Icon name="terminal" size={80} className="text-emerald-500/20 mx-auto mb-6"/><h3 className="text-3xl font-black uppercase tracking-tighter">API Shortlink</h3><p className="text-slate-500 max-w-sm mx-auto">Gunakan API Key anda untuk integrasi aplikasi pihak ketiga: <code className="bg-slate-900 px-3 py-1 rounded text-blue-400 font-mono">sk_ultra_7722119988</code></p></div>; }
+        function RegisterPage({ onSwitch }) { return <div className="min-h-screen flex items-center justify-center p-6"><Card className="w-full max-w-md p-10 text-center"><Icon name="user-plus" size={48} className="text-blue-500 mx-auto mb-6"/><h2 className="text-2xl font-bold mb-8">Buat Akun Member</h2><div className="space-y-4 mb-8"><FormGroup label="Nama Lengkap" /><FormGroup label="Email" /><FormGroup label="Password" type="password" /></div><button onClick={onSwitch} className="w-full bg-blue-600 py-4 rounded-xl font-bold">Daftar Sekarang</button><p className="mt-6 text-xs text-slate-500">Sudah punya akun? <button onClick={onSwitch} className="text-blue-500">Login</button></p></Card></div>; }
+        function ForgotPage({ onBack }) { return <div className="min-h-screen flex items-center justify-center p-6"><Card className="w-full max-w-md p-10 text-center"><Icon name="key" size={48} className="text-amber-500 mx-auto mb-6"/><h2 className="text-2xl font-bold mb-4">Lupa Password?</h2><p className="text-sm text-slate-500 mb-8">Masukkan email anda dan kami akan mengirimkan instruksi reset.</p><FormGroup label="Email" /><button className="w-full bg-blue-600 py-4 rounded-xl font-bold mt-6">Kirim Link Reset</button><button onClick={onBack} className="mt-6 text-xs text-slate-500 underline">Kembali ke Login</button></Card></div>; }
+        function AdminPanelView() { return <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in"><StatCard label="Total User" value="1.240" icon="users" color="text-blue-400" bg="bg-blue-400/10" trend="8 Member baru hari ini" /><StatCard label="Server Status" value="99.9%" icon="server" color="text-emerald-400" bg="bg-emerald-400/10" trend="Lokasi: Singapore 01" /><StatCard label="Active Links Global" value="14.892" icon="zap" color="text-amber-400" bg="bg-amber-400/10" trend="Total: 1.2M klik" /></div>; }
+        function SettingsView({ user, setUser, showToast }) { 
+            const [name, setName] = useState(user.name);
+            return <div className="max-w-xl animate-in"><Card className="space-y-8"><h3 className="text-2xl font-bold">Profil Akun</h3><div className="space-y-6"><FormGroup label="Nama Tampilan" value={name} onChange={v => setName(v)} /><FormGroup label="Email Address" value={user.email} disabled /><div className="bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 text-xs text-blue-400">Role anda saat ini adalah <strong className="uppercase">{user.role}</strong>. Hubungi admin untuk upgrade.</div><button onClick={() => { setUser({...user, name}); showToast("Profil Diperbarui!"); }} className="bg-blue-600 px-8 py-3 rounded-xl font-bold">Update Profil</button></div></Card></div>;
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
